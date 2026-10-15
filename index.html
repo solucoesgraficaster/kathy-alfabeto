@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kathy e o Alfabeto Mágico</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(#fff9e9,#e8f3d8);font-family:Trebuchet MS,Arial,sans-serif;color:#284a2e;text-align:center;min-height:100vh}
+header{background:#527c49;color:white;padding:22px;border-radius:0 0 25px 25px}
+h1{font-size:clamp(24px,5vw,38px);margin:0}
+main{max-width:700px;margin:auto;padding:16px}
+.panel{background:#fff8e8;border:2px solid #c5d7ae;border-radius:22px;padding:16px;margin:12px 0}
+.levels,.actions{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin:12px 0}
+button{cursor:pointer;font:inherit}
+.levels button,.action{background:#527c49;color:white;border:0;border-radius:12px;padding:12px;font-weight:bold}
+.levels button.selected{background:#db9230;color:#253420}
+.stats{display:flex;justify-content:space-around;flex-wrap:wrap;gap:8px;font-weight:bold}
+.picture{font-size:95px;margin:10px}
+.word{font-size:clamp(26px,6vw,40px);font-weight:bold;letter-spacing:2px}
+.choices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:440px;margin:20px auto}
+.choice{background:white;border:3px solid #9abb82;border-radius:17px;min-height:85px;font-size:42px;font-weight:bold;color:#284a2e}
+.choice.correct{background:#bce8a6}
+.choice.wrong{background:#ffe0d5}
+.choice:disabled{opacity:1}
+#feedback{min-height:42px;font-weight:bold;font-size:18px}
+.progress{height:12px;background:#dce9c6;border-radius:20px;overflow:hidden}
+#bar{height:100%;background:#7bad52;width:0}
+footer{padding:15px}
+</style>
+</head>
+<body>
+<header><h1>🌳 Kathy e o Alfabeto Mágico</h1><p>Aprenda brincando na Floresta Encantada!</p></header>
+<main>
+<section class="panel">
+<strong>Escolha sua aventura:</strong>
+<div class="levels">
+<button data-level="0">🌱 Fácil</button>
+<button data-level="1">🌼 Médio</button>
+<button data-level="2">🌳 Desafio</button>
+</div>
+</section>
+<section class="panel stats">
+<span>⭐ Acertos: <span id="score">0</span></span>
+<span>📖 Rodada: <span id="round">1/8</span></span>
+<span>🏆 Estrelas: <span id="stars">0</span></span>
+</section>
+<section class="panel">
+<div class="progress"><div id="bar"></div></div>
+<div class="picture" id="picture">🌳</div>
+<div class="word" id="word">ÁRVORE</div>
+<p id="instruction">Qual é a primeira letra desta palavra?</p>
+<div class="choices" id="choices"></div>
+<div id="feedback" role="status" aria-live="polite"></div>
+<div class="actions">
+<button class="action" id="hear">🔊 Ouvir palavra</button>
+<button class="action" id="next" hidden>Próxima ➜</button>
+</div>
+</section>
+<button class="action" id="restart">🔄 Recomeçar</button>
+</main>
+<footer>💚 Kathy e a Turminha da Floresta Encantada</footer>
+<script>
+const levels=[
+[{w:'ÁRVORE',e:'🌳'},{w:'BOLA',e:'⚽'},{w:'CASA',e:'🏠'},{w:'DADO',e:'🎲'},{w:'ELEFANTE',e:'🐘'},{w:'FLOR',e:'🌼'},{w:'GATO',e:'🐱'},{w:'HIPOPÓTAMO',e:'🦛'}],
+[{w:'IGREJA',e:'⛪'},{w:'JANELA',e:'🪟'},{w:'KATHY',e:'👧🏽'},{w:'LIVRO',e:'📖'},{w:'MACACO',e:'🐵'},{w:'NAVIO',e:'🚢'},{w:'OVELHA',e:'🐑'},{w:'PATO',e:'🦆'}],
+[{w:'QUEIJO',e:'🧀'},{w:'RATO',e:'🐭'},{w:'SAPO',e:'🐸'},{w:'TARTARUGA',e:'🐢'},{w:'UVA',e:'🍇'},{w:'VELA',e:'🕯️'},{w:'XÍCARA',e:'☕'},{w:'ZEBRA',e:'🦓'}]
+];
+const $=id=>document.getElementById(id);
+let deck=[],level=0,index=0,score=0,stars=0,answered=false;
+function shuffle(a){for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function start(n){
+level=n;deck=shuffle([...levels[n]]);index=0;score=0;stars=0;
+document.querySelectorAll('[data-level]').forEach(b=>b.classList.toggle('selected',Number(b.dataset.level)===n));
+show();
+}
+function show(){
+answered=false;
+const item=deck[index];
+$('picture').textContent=item.e;
+$('word').textContent=item.w;
+$('score').textContent=score;
+$('stars').textContent=stars;
+$('round').textContent=(index+1)+'/'+deck.length;
+$('bar').style.width=(index/deck.length*100)+'%';
+$('feedback').textContent='';
+$('instruction').textContent='Qual é a primeira letra desta palavra?';
+$('hear').hidden=false;$('next').hidden=true;
+const right=item.w[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const options=shuffle([right,...shuffle(alphabet.filter(x=>x!==right)).slice(0,2)]);
+$('choices').replaceChildren();
+options.forEach(letter=>{
+const b=document.createElement('button');
+b.className='choice';b.textContent=letter;
+b.onclick=()=>answer(b,letter,right);
+$('choices').appendChild(b);
+});
+}
+function answer(b,letter,right){
+if(answered)return;
+answered=true;
+document.querySelectorAll('.choice').forEach(x=>{
+x.disabled=true;
+if(x.textContent===right)x.classList.add('correct');
+});
+if(letter===right){
+score++;stars+=3;
+$('feedback').textContent='🌟 Muito bem! '+right+' de '+deck[index].w+'!';
+}else{
+stars++;b.classList.add('wrong');
+$('feedback').textContent='💚 Boa tentativa! '+deck[index].w+' começa com '+right+'.';
+}
+$('score').textContent=score;$('stars').textContent=stars;
+$('next').hidden=false;
+$('next').textContent=index===deck.length-1?'Ver resultado 🎉':'Próxima ➜';
+}
+function next(){
+if(!answered)return;
+index++;
+if(index===deck.length){
+$('picture').textContent='🏆';
+$('word').textContent='PARABÉNS!';
+$('instruction').textContent='Você terminou a aventura!';
+$('choices').replaceChildren();
+$('feedback').textContent='Você acertou '+score+' de '+deck.length+' palavras e ganhou '+stars+' estrelas!';
+$('bar').style.width='100%';
+$('round').textContent=deck.length+'/'+deck.length;
+$('next').hidden=true;$('hear').hidden=true;
+return;
+}
+show();
+}
+function hear(){
+if(!('speechSynthesis' in window)){
+$('feedback').textContent='Áudio não disponível neste navegador.';return;
+}
+speechSynthesis.cancel();
+const voice=new SpeechSynthesisUtterance(deck[index].w.toLocaleLowerCase('pt-BR'));
+voice.lang='pt-BR';voice.rate=.8;speechSynthesis.speak(voice);
+}
+document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>start(Number(b.dataset.level)));
+$('next').onclick=next;$('hear').onclick=hear;$('restart').onclick=()=>start(level);
+start(0);
+</script>
+</body>
+</html>
